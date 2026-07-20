@@ -1,0 +1,47 @@
+services:
+  videoshelf:
+    image: baibaibai122/videoshelf:latest
+    build: .
+    container_name: videoshelf
+    ports:
+      - "8080:8080"
+    volumes:
+      # ============================================================
+      # 绿联 NAS / Docker 配置说明（可在创建后编辑）
+      # ------------------------------------------------------------
+      # 1. 视频目录（机械硬盘推荐）：容器内固定 /data/videos
+      #    把左边改成你机械盘上的视频文件夹，例如：
+      #    /volume2/视频库:/data/videos
+      #    或 共享文件夹/视频:/data/videos
+      #
+      # 2. 数据库（固态硬盘推荐）：容器内固定 /app/database
+      #    例如：/volume1/docker/videoshelf/database:/app/database
+      #
+      # 3. 缩略图缓存（固态硬盘推荐）：容器内固定 /app/storage/thumbnails
+      #    例如：/volume1/docker/videoshelf/thumbnails:/app/storage/thumbnails
+      #
+      # 注意：三个映射可以分别指向不同硬盘，互不影响。
+      # 创建容器后可在 NAS Docker 页面直接编辑这些挂载路径。
+      # ============================================================
+
+      # 【必须】视频文件目录 → 建议映射到机械硬盘
+      - ${VIDEO_PATH:-./sample-videos}:/data/videos
+
+      # 【推荐】数据库目录 → 建议映射到固态硬盘（小文件、频繁读写）
+      - ${DB_PATH:-./data/database}:/app/database
+
+      # 【推荐】缩略图目录 → 建议映射到固态硬盘
+      - ${THUMB_PATH:-./data/thumbnails}:/app/storage/thumbnails
+
+    environment:
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-long-random-secret-key-in-production}
+      - ALLOW_DELETE_FILES=${ALLOW_DELETE_FILES:-true}
+      - ENABLE_WATCHER=${ENABLE_WATCHER:-true}
+      - VIDEO_ROOT=/data/videos
+      - THUMBNAIL_DIR=/app/storage/thumbnails
+      - DATABASE_URL=sqlite:////app/database/video_manager.db
+    restart: unless-stopped
+    # 如遇权限问题（视频目录读不到），可注释掉下面这行，让容器以 root 运行
+    # user: "1000:1000"

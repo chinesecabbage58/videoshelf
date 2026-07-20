@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VideoShelf</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            iq: {
+              bg: '#0b0b0f', card: '#1a1a22', panel: '#14141b', border: '#2a2a35',
+              accent: '#00c476', accent2: '#00e676', muted: '#8a8a9a', text: '#f0f0f5'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdn.staticfile.org/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    [v-cloak]{display:none}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#0b0b0f;color:#f0f0f5}
+    .line-clamp-1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    /* 防止 iOS 点击输入框自动放大 */
+    input,select,textarea{font-size:16px !important}
+    @media (min-width:640px){
+      input,select,textarea{font-size:14px !important}
+    }
+    .btn-disabled{opacity:0.35;cursor:not-allowed;pointer-events:none}
+    /* 仅 PC 端有悬浮效果，移动端无悬浮/点击样式；去掉投影 */
+    @media (hover:hover) and (min-width:640px){
+      .card-hover{transition:transform .2s ease,border-color .2s ease}
+      .card-hover:hover{transform:translateY(-3px)}
+      .card-hover:hover .card-border{border-color:rgba(0,196,118,.6)}
+      .card-hover:hover .card-img{transform:scale(1.05)}
+      .card-hover:hover .card-play{opacity:1}
+      .card-hover:hover .card-title{color:#00c476}
+    }
+    /* 下拉框主题色 */
+    select.vs-select{
+      color:#f0f0f5 !important;
+      background-color:#1a1a22;
+      border-color:#2a2a35;
+      accent-color:#00c476;
+      outline:none;
+      color-scheme:dark;
+    }
+    select.vs-select:focus{
+      border-color:#00c476;
+      box-shadow:0 0 0 1px #00c476;
+    }
+    select.vs-select option{
+      background:#1a1a22;
+      color:#f0f0f5;
+    }
+    select.vs-select option:checked,
+    select.vs-select option:hover{
+      background:#00c476;
+      color:#000;
+    }
+    /* 全局去掉浏览器默认蓝色，统一为主题绿 */
+    :root{accent-color:#00c476}
+    *{caret-color:#00c476}
+    a{color:#00c476}
+    a:hover{color:#00e676}
+    ::selection{background:rgba(0,196,118,.35);color:#fff}
+    :focus{outline:none}
+    :focus-visible{outline:2px solid #00c476;outline-offset:2px}
+    input:focus,select:focus,textarea:focus,button:focus{
+      outline:none;
+      border-color:#00c476 !important;
+      box-shadow:0 0 0 1px rgba(0,196,118,.5);
+    }
+    input[type="checkbox"],input[type="radio"]{accent-color:#00c476}
+    progress{accent-color:#00c476}
+    /* 浏览器自动填充背景不要蓝/黄 */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus{
+      -webkit-text-fill-color:#f0f0f5;
+      -webkit-box-shadow:0 0 0px 1000px #1a1a22 inset;
+      transition:background-color 9999s ease-in-out 0s;
+      caret-color:#00c476;
+    }
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:#14141b}
+    ::-webkit-scrollbar-thumb{background:#3a3a48;border-radius:3px}
+  </style>
+</head>
+<body>
+<div id="app-loading" style="position:fixed;inset:0;background:#0b0b0f;color:#8a8a9a;display:flex;align-items:center;justify-content:center;font-family:sans-serif;z-index:9999">
+  <div style="text-align:center">
+    <div style="width:36px;height:36px;border:3px solid #2a2a35;border-top-color:#00c476;border-radius:50%;margin:0 auto 16px;animation:spin 0.8s linear infinite"></div>
+    <div>加载中…</div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<div id="app" v-cloak>
+  <!-- Login -->
+  <div v-if="!token" class="min-h-screen flex items-center justify-center bg-iq-bg">
+    <div class="w-full max-w-md p-8 bg-iq-card rounded-2xl border border-iq-border">
+      <div class="text-center mb-8">
+        <div class="inline-flex w-14 h-14 rounded-2xl bg-iq-accent/20 items-center justify-center mb-4"><i class="fas fa-play text-2xl text-iq-accent"></i></div>
+        <h1 class="text-2xl font-bold">VideoShelf</h1>
+      </div>
+      <form @submit.prevent="login" class="space-y-4">
+        <input v-model="loginForm.username" type="text" required placeholder="用户名" class="w-full px-4 py-3 bg-iq-panel border border-iq-border rounded-xl focus:outline-none focus:border-iq-accent">
+        <input v-model="loginForm.password" type="password" required placeholder="密码" class="w-full px-4 py-3 bg-iq-panel border border-iq-border rounded-xl focus:outline-none focus:border-iq-accent">
+        <div v-if="loginError" class="text-red-400 text-sm">{{ loginError }}</div>
+        <button type="submit" :disabled="loggingIn" class="w-full py-3 bg-iq-accent hover:bg-iq-accent2 text-black font-semibold rounded-xl disabled:opacity-50">{{ loggingIn?'登录中...':'登录' }}</button>
+      </form>
+    </div>
+  </div>
+
+  <div v-else class="min-h-screen flex flex-col">
+    <header class="h-14 bg-iq-panel/95 backdrop-blur border-b border-iq-border sticky top-0 z-40 flex items-center px-3 sm:px-4 gap-2 sm:gap-3">
+      <div class="flex items-center gap-2 shrink-0 cursor-pointer" @click="goHome">
+        <div class="w-8 h-8 rounded-lg bg-iq-accent flex items-center justify-center"><i class="fas fa-play text-black text-sm"></i></div>
+        <span class="font-bold text-lg hidden sm:block">VideoShelf</span>
+      </div>
+      <div v-if="page!=='settings'" class="flex-1 max-w-xl mx-auto flex items-center gap-2">
+        <button @click="toggleFilter" class="shrink-0 flex items-center gap-1 px-2.5 sm:px-3 py-2 rounded-full text-sm border transition"
+          :class="showFilter||activeTagIds.length ? 'bg-iq-accent/15 border-iq-accent text-iq-accent' : 'bg-iq-bg border-iq-border text-iq-muted hover:text-white'">
+          <i class="fas fa-filter text-xs"></i>
+          <span class="hidden sm:inline">筛选</span>
+          <span v-if="activeTagIds.length" class="w-1.5 h-1.5 rounded-full bg-iq-accent"></span>
+        </button>
+        <div class="flex-1 relative min-w-0 flex items-center">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-iq-muted text-sm pointer-events-none"></i>
+          <input v-model="searchQuery" @keyup.enter="doSearch" type="text" enterkeyhint="search" placeholder="搜索名称 / 标签 / 简介" class="w-full pl-9 pr-20 py-2 bg-iq-bg border border-iq-border rounded-full text-sm focus:outline-none focus:border-iq-accent" style="font-size:16px">
+          <button v-if="searchQuery" type="button" @click="searchQuery='';doSearch()" class="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-iq-accent hover:bg-iq-accent/15 transition" title="清除">
+            <i class="fas fa-times text-xs"></i>
+          </button>
+          <button @click="doSearch" class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-iq-accent text-black flex items-center justify-center hover:bg-iq-accent2 transition shrink-0" title="搜索">
+            <i class="fas fa-search text-xs"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex items-center gap-1 shrink-0 ml-auto">
+        <span v-if="scanning" class="text-xs text-iq-accent hidden sm:inline mr-1"><i class="fas fa-spinner fa-spin mr-1"></i>同步中</span>
+        <button @click="openSettings" class="w-9 h-9 flex items-center justify-center rounded-lg text-sm" :class="page==='settings'?'text-iq-accent':'text-iq-muted hover:text-white'"><i class="fas fa-cog"></i></button>
+        <button @click="logout" class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-iq-muted hover:text-white" title="退出登录"><i class="fas fa-sign-out-alt"></i></button>
+      </div>
+    </header>
+
+    <!-- 筛选面板（点击筛选后展开） -->
+    <div v-if="showFilter && page==='home'" class="bg-iq-panel border-b border-iq-border px-4 py-3 sticky top-14 z-30">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs text-iq-muted">按标签筛选（可多选）</span>
+          <button v-if="activeTagIds.length" @click="clearTagFilter" class="text-xs text-iq-accent hover:underline">清除筛选</button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button @click="clearTagFilter" :class="!activeTagIds.length?'bg-iq-accent text-black':'bg-iq-card text-iq-muted border border-iq-border'" class="px-3 py-1 rounded-full text-xs transition">全部</button>
+          <button v-for="t in tags" :key="t.id" @click="toggleTagFilter(t.id)"
+            :class="activeTagIds.includes(t.id)?'bg-iq-accent text-black':'bg-iq-card text-iq-muted border border-iq-border'"
+            class="px-3 py-1 rounded-full text-xs transition">#{{ t.name }}</button>
+          <span v-if="!tags.length" class="text-xs text-iq-muted">暂无标签，可在设置中添加</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 首页 -->
+    <main v-if="page==='home'" class="flex-1">
+      <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">全部视频 <span class="text-iq-muted text-sm font-normal ml-2">{{ total }} 部</span></h2>
+          <div class="flex items-center gap-1.5">
+            <button v-for="opt in sortOptions" :key="opt.value"
+              @click="toggleSort(opt.value)"
+              class="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm border transition flex items-center gap-1"
+              :class="sortBy===opt.value ? 'bg-iq-accent/15 border-iq-accent text-iq-accent' : 'bg-iq-card border-iq-border text-iq-muted hover:text-white'">
+              {{ opt.label }}
+              <i v-if="sortBy===opt.value" :class="sortOrder==='asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'" class="text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+        <div v-if="loading&&videos.length===0" class="flex justify-center py-20"><i class="fas fa-spinner fa-spin text-3xl text-iq-accent"></i></div>
+        <div v-else-if="!loading&&videos.length===0" class="text-center py-20 text-iq-muted">
+          <i class="fas fa-film text-5xl mb-4 opacity-30"></i>
+          <p>暂无视频</p>
+          <p class="text-sm mt-2">放入挂载目录后会自动同步</p>
+        </div>
+        <div v-else :key="'page-'+pageNum" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div v-for="v in videos" :key="v.id" class="card-hover cursor-pointer" @click="openDetail(v)">
+            <div class="card-border aspect-video bg-black rounded-xl overflow-hidden relative border border-iq-border transition">
+              <img v-if="v.thumbnail" :src="'/thumbnails/'+v.thumbnail" class="card-img absolute inset-0 w-full h-full object-cover transition duration-300" loading="lazy">
+              <div v-else class="w-full h-full flex items-center justify-center text-iq-muted"><i class="fas fa-film text-3xl"></i></div>
+              <span class="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/70 rounded text-xs font-mono">{{ v.duration_str }}</span>
+              <!-- 仅 PC 悬浮显示播放图标，移动端不显示 -->
+              <div class="card-play absolute inset-0 hidden sm:flex items-center justify-center opacity-0 transition pointer-events-none">
+                <div class="w-10 h-10 rounded-full bg-iq-accent/90 flex items-center justify-center"><i class="fas fa-play text-black text-sm ml-0.5"></i></div>
+              </div>
+            </div>
+            <div class="mt-2 px-0.5">
+              <p class="card-title text-xs sm:text-sm font-medium line-clamp-1 truncate transition">{{ v.filename }}</p>
+              <p v-if="v.notes" class="text-xs text-iq-muted line-clamp-1 truncate mt-0.5">{{ v.notes }}</p>
+              <div v-if="v.tags&&v.tags.length" class="flex gap-1 mt-1 overflow-hidden whitespace-nowrap">
+                <span v-for="t in v.tags.slice(0,3)" :key="t.id" class="text-[10px] text-white/70 shrink-0">#{{ t.name }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center justify-center gap-3 py-10 flex-wrap">
+          <button type="button" @click="prevPage"
+            class="px-4 py-2 rounded-lg text-sm border select-none transition"
+            :class="canPrev ? 'bg-iq-card border-iq-border text-white cursor-pointer hover:border-iq-accent hover:text-iq-accent' : 'bg-iq-card/40 border-iq-border/40 text-iq-muted/40 cursor-not-allowed'">上一页</button>
+          <span class="text-sm text-iq-muted tabular-nums">第 {{ pageLabel }} / {{ totalPages }} 页 · 共 {{ total }} 部</span>
+          <button type="button" @click="nextPage"
+            class="px-4 py-2 rounded-lg text-sm border select-none transition"
+            :class="canNext ? 'bg-iq-card border-iq-border text-white cursor-pointer hover:border-iq-accent hover:text-iq-accent' : 'bg-iq-card/40 border-iq-border/40 text-iq-muted/40 cursor-not-allowed'">下一页</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- 详情 -->
+    <main v-if="page==='detail'&&selected" class="flex-1 flex flex-col">
+      <!-- 固定顶部栏：返回 + 标题 -->
+      <div class="sticky top-0 z-40 h-12 bg-iq-panel/95 backdrop-blur border-b border-iq-border flex items-center px-3 sm:px-4 gap-3">
+        <button @click="goHome" class="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-iq-muted hover:text-white hover:bg-white/5 transition" title="返回">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <h1 class="text-sm sm:text-base font-medium truncate flex-1 min-w-0">{{ selected.filename }}</h1>
+      </div>
+      <div class="bg-black">
+        <div class="max-w-7xl mx-auto">
+          <div class="aspect-video relative">
+            <video ref="player" controls playsinline webkit-playsinline x5-playsinline class="w-full h-full object-contain bg-black" :src="'/api/videos/'+selected.id+'/stream?token='+token" preload="metadata"></video>
+          </div>
+        </div>
+      </div>
+      <div class="max-w-7xl mx-auto px-4 py-6 w-full flex-1">
+        <div class="flex flex-col lg:flex-row gap-8">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap gap-3 text-xs sm:text-sm text-iq-muted mb-4">
+              <span>{{ selected.duration_str }}</span>
+              <span v-if="selected.resolution">{{ selected.resolution }}</span>
+              <span>{{ formatSize(selected.filesize) }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-6">
+              <button @click="regenThumb(selected)" class="px-4 py-2 bg-iq-card border border-iq-border rounded-xl text-sm text-iq-muted hover:text-white"><i class="fas fa-image mr-1"></i>重新生成封面</button>
+              <button @click="confirmDelete(selected)" class="px-4 py-2 bg-iq-card border border-red-500/30 rounded-xl text-sm text-red-400"><i class="fas fa-trash mr-1"></i>删除</button>
+            </div>
+            <div class="bg-iq-card border border-iq-border rounded-2xl p-5 mb-4">
+              <h3 class="font-semibold mb-3">简介</h3>
+              <p class="text-iq-muted text-sm whitespace-pre-wrap">{{ selected.notes || '暂无简介' }}</p>
+            </div>
+            <div class="bg-iq-card border border-iq-border rounded-2xl p-4 mb-4">
+              <div class="text-xs text-iq-muted mb-2">标签</div>
+              <div class="flex flex-wrap gap-1.5">
+                <span v-for="t in selected.tags" :key="t.id" class="px-2.5 py-1 rounded-full text-xs bg-iq-accent/10 text-iq-accent">#{{ t.name }}</span>
+                <span v-if="!selected.tags||!selected.tags.length" class="text-iq-muted text-xs">无标签</span>
+              </div>
+            </div>
+            <div v-if="selected.preview_images&&selected.preview_images.length" class="bg-iq-card border border-iq-border rounded-2xl p-4 mb-4">
+              <h4 class="font-semibold mb-3 text-sm">预览</h4>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <img v-for="(p,i) in selected.preview_images" :key="i" :src="'/thumbnails/'+p" class="rounded-lg aspect-video object-cover cursor-pointer hover:ring-2 hover:ring-iq-accent" @click="seekPreview(i)">
+              </div>
+            </div>
+          </div>
+          <aside class="w-full lg:w-72 shrink-0 space-y-4">
+            <div class="bg-iq-card border border-iq-border rounded-2xl p-4 text-sm space-y-2">
+              <h4 class="font-semibold mb-2">视频信息</h4>
+              <div class="flex justify-between gap-2"><span class="text-iq-muted">大小</span><span>{{ formatSize(selected.filesize) }}</span></div>
+              <div class="flex justify-between gap-2"><span class="text-iq-muted">编码</span><span>{{ selected.codec||'-' }}</span></div>
+              <div class="flex justify-between gap-2"><span class="text-iq-muted">路径</span><span class="truncate max-w-[140px] text-xs" :title="selected.relative_path">{{ selected.relative_path }}</span></div>
+            </div>
+          </aside>
+        </div>
+        <!-- 相关推荐固定在最下方 -->
+        <div class="mt-10 pt-6 border-t border-iq-border">
+          <h3 class="font-semibold text-lg mb-4">相关推荐</h3>
+          <div v-if="recsLoading" class="text-center text-iq-muted py-6"><i class="fas fa-spinner fa-spin"></i></div>
+          <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div v-for="r in recommendations" :key="r.id" class="cursor-pointer group" @click="openDetail(r)">
+              <div class="aspect-video bg-black rounded-xl overflow-hidden border border-iq-border relative sm:group-hover:border-iq-accent/60 transition">
+                <img v-if="r.thumbnail" :src="'/thumbnails/'+r.thumbnail" class="w-full h-full object-cover sm:group-hover:scale-105 transition duration-300">
+                <span class="absolute bottom-1.5 right-1.5 px-1 py-0.5 bg-black/70 rounded text-[10px] font-mono">{{ r.duration_str }}</span>
+              </div>
+              <p class="mt-1.5 text-xs sm:text-sm line-clamp-2">{{ r.filename }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 设置 -->
+    <main v-if="page==='settings'" class="flex-1 max-w-6xl mx-auto px-4 py-8 w-full">
+      <div class="flex items-center gap-3 mb-6">
+        <button @click="goHome" class="w-9 h-9 flex items-center justify-center rounded-lg text-iq-muted hover:text-white hover:bg-white/5 transition" title="返回">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2 class="text-xl font-bold">设置</h2>
+      </div>
+      <div class="flex gap-2 mb-6 border-b border-iq-border pb-3 flex-wrap">
+        <button @click="settingsTab='videos'" :class="settingsTab==='videos'?'text-iq-accent border-b-2 border-iq-accent':''" class="px-4 py-2 text-sm text-iq-muted">视频管理</button>
+        <button @click="settingsTab='tags'" :class="settingsTab==='tags'?'text-iq-accent border-b-2 border-iq-accent':''" class="px-4 py-2 text-sm text-iq-muted">标签管理</button>
+        <button @click="settingsTab='preview'" :class="settingsTab==='preview'?'text-iq-accent border-b-2 border-iq-accent':''" class="px-4 py-2 text-sm text-iq-muted">预览图</button>
+        <button @click="settingsTab='paging'" :class="settingsTab==='paging'?'text-iq-accent border-b-2 border-iq-accent':''" class="px-4 py-2 text-sm text-iq-muted">分页管理</button>
+        <button @click="settingsTab='sync'" :class="settingsTab==='sync'?'text-iq-accent border-b-2 border-iq-accent':''" class="px-4 py-2 text-sm text-iq-muted">同步刷新</button>
+        <button @click="settingsTab='account'" :class="settingsTab==='account'?'text-iq-accent border-b-2 border-iq-accent':''" class="px-4 py-2 text-sm text-iq-muted">账户</button>
+      </div>
+
+      <!-- 视频管理 -->
+      <div v-if="settingsTab==='videos'">
+        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 mb-4 items-stretch sm:items-center">
+          <input v-model="mgmtQuery" @keyup.enter="loadMgmt(true)" type="text" placeholder="搜索文件名…" class="flex-1 min-w-0 w-full sm:min-w-[160px] px-3 py-2 bg-iq-card border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+          <div class="flex gap-2">
+            <div class="relative flex-1 sm:flex-none">
+              <button type="button" @click="mgmtFilterOpen=!mgmtFilterOpen;openTagPickerId=null" class="w-full sm:w-auto min-w-[7rem] px-3 py-2 bg-iq-card border border-iq-border rounded-xl text-sm text-white flex items-center justify-between gap-2 hover:border-iq-accent focus:border-iq-accent">
+                <span>{{ mgmtFilterLabel }}</span>
+                <i class="fas fa-chevron-down text-[10px] text-iq-muted"></i>
+              </button>
+              <div v-if="mgmtFilterOpen" class="absolute z-50 mt-1 left-0 right-0 sm:right-auto sm:min-w-full bg-iq-card border border-iq-border rounded-xl overflow-hidden shadow-lg">
+                <button type="button" v-for="opt in mgmtFilterOptions" :key="opt.value" @click="setMgmtFilter(opt.value)"
+                  class="w-full text-left px-3 py-2 text-sm transition"
+                  :class="mgmtFilter===opt.value ? 'bg-iq-accent text-black' : 'text-white hover:bg-iq-accent/20'">{{ opt.label }}</button>
+              </div>
+            </div>
+            <button @click="loadMgmt(true)" class="px-4 py-2 bg-iq-accent text-black text-sm font-medium rounded-xl shrink-0">搜索</button>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <div v-for="v in mgmtVideos" :key="v.id" class="bg-iq-card border border-iq-border rounded-2xl p-3 sm:p-4 overflow-hidden">
+            <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div class="w-full sm:w-28 h-36 sm:h-16 shrink-0 rounded-lg bg-black overflow-hidden">
+                <img v-if="v.thumbnail" :src="'/thumbnails/'+v.thumbnail" class="w-full h-full object-cover">
+                <div v-else class="w-full h-full flex items-center justify-center text-iq-muted"><i class="fas fa-film"></i></div>
+              </div>
+              <div class="flex-1 min-w-0 space-y-3 overflow-hidden">
+                <div>
+                  <label class="text-[11px] text-iq-muted">文件名</label>
+                  <div class="mt-0.5 flex items-center gap-1">
+                    <input :value="fileBase(v.filename)" @change="saveFilenameBase(v,$event.target.value)" class="flex-1 min-w-0 w-0 px-3 py-2 bg-iq-bg border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+                    <span class="text-sm text-iq-muted shrink-0 px-2 py-2 bg-iq-panel border border-iq-border rounded-xl">{{ fileExt(v.filename) }}</span>
+                  </div>
+                  <div class="text-[11px] text-iq-muted mt-1">{{ v.duration_str }} · {{ formatSize(v.filesize) }}</div>
+                </div>
+                <div>
+                  <label class="text-[11px] text-iq-muted">标签</label>
+                  <div class="flex flex-wrap gap-1.5 mt-1 mb-2">
+                    <span v-for="t in v.tags" :key="t.id" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-white/10 text-white/80">
+                      #{{ t.name }} <button @click="mgmtRemoveTag(v,t)" class="hover:text-red-400"><i class="fas fa-times text-[10px]"></i></button>
+                    </span>
+                    <span v-if="!v.tags||!v.tags.length" class="text-xs text-iq-muted">暂无标签</span>
+                  </div>
+                  <div class="flex flex-col xs:flex-row flex-wrap gap-2">
+                    <div class="relative w-full sm:w-auto">
+                      <button type="button" @click="openTagPickerId=openTagPickerId===v.id?null:v.id;mgmtFilterOpen=false" class="w-full sm:w-auto px-2.5 py-1.5 bg-iq-bg border border-iq-border rounded-lg text-xs text-white flex items-center justify-between gap-2 hover:border-iq-accent min-w-[8rem]">
+                        <span>选择已有标签</span>
+                        <i class="fas fa-chevron-down text-[10px] text-iq-muted"></i>
+                      </button>
+                      <div v-if="openTagPickerId===v.id" class="absolute z-50 mt-1 left-0 right-0 sm:min-w-[10rem] bg-iq-card border border-iq-border rounded-xl overflow-hidden shadow-lg max-h-48 overflow-y-auto">
+                        <button type="button" v-if="!availableTags(v).length" class="w-full text-left px-3 py-2 text-xs text-iq-muted" disabled>暂无可选标签</button>
+                        <button type="button" v-for="t in availableTags(v)" :key="t.id" @click="mgmtAddTagById(v,t.id)"
+                          class="w-full text-left px-3 py-2 text-xs text-white hover:bg-iq-accent hover:text-black transition">{{ t.name }}</button>
+                      </div>
+                    </div>
+                    <div class="flex gap-1 flex-1 min-w-0 w-full sm:min-w-[140px]">
+                      <input v-model="v._newTag" @keyup.enter="createAndAddTag(v)" placeholder="输入新标签名" class="flex-1 min-w-0 px-2 py-1.5 bg-iq-bg border border-iq-border rounded-lg text-xs focus:outline-none focus:border-iq-accent">
+                      <button @click="createAndAddTag(v)" class="px-3 py-1.5 bg-iq-accent text-black rounded-lg text-xs font-medium shrink-0">新建并添加</button>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-[11px] text-iq-muted">简介</label>
+                  <textarea :value="v.notes||''" @change="saveNotes(v,$event.target.value)" rows="2" placeholder="填写视频简介…" class="mt-0.5 w-full px-3 py-2 bg-iq-bg border border-iq-border rounded-xl text-sm resize-y focus:outline-none focus:border-iq-accent"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-if="!mgmtVideos.length" class="text-center text-iq-muted py-12 bg-iq-card border border-iq-border rounded-2xl">暂无数据</div>
+        </div>
+        <!-- 分页 -->
+        <div class="flex items-center justify-center gap-3 mt-5 flex-wrap">
+          <button @click="mgmtPage>1&&(mgmtPage--,loadMgmt(false))" :disabled="mgmtPage<=1"
+            class="px-3 py-1.5 rounded-lg text-sm border transition select-none"
+            :class="mgmtPage<=1 ? 'bg-iq-card/50 border-iq-border/50 text-iq-muted/40 cursor-not-allowed pointer-events-none' : 'bg-iq-card border-iq-border hover:border-iq-accent hover:text-iq-accent active:scale-95 cursor-pointer'">上一页</button>
+          <span class="text-sm text-iq-muted">第 {{ mgmtPage }} / {{ mgmtTotalPages }} 页（共 {{ mgmtTotal }}）</span>
+          <button @click="mgmtPage<mgmtTotalPages&&(mgmtPage++,loadMgmt(false))" :disabled="mgmtPage>=mgmtTotalPages"
+            class="px-3 py-1.5 rounded-lg text-sm border transition select-none"
+            :class="mgmtPage>=mgmtTotalPages ? 'bg-iq-card/50 border-iq-border/50 text-iq-muted/40 cursor-not-allowed pointer-events-none' : 'bg-iq-card border-iq-border hover:border-iq-accent hover:text-iq-accent active:scale-95 cursor-pointer'">下一页</button>
+        </div>
+      </div>
+
+            <!-- 标签管理 -->
+      <div v-if="settingsTab==='tags'" class="max-w-xl">
+        <div class="bg-iq-card border border-iq-border rounded-2xl p-6 space-y-5">
+          <div>
+            <h3 class="font-semibold">标签管理</h3>
+            <p class="text-xs text-iq-muted mt-1">新增或删除全局标签。删除后，视频上的该标签也会移除。</p>
+          </div>
+          <div class="flex gap-2">
+            <input v-model="newGlobalTag" @keyup.enter="createGlobalTag" type="text" placeholder="输入新标签名称" class="flex-1 px-3 py-2 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+            <button @click="createGlobalTag" class="px-4 py-2 bg-iq-accent text-black text-sm font-medium rounded-xl shrink-0">添加</button>
+          </div>
+          <div v-if="!tags.length" class="text-sm text-iq-muted py-4 text-center">暂无标签</div>
+          <div class="space-y-2">
+            <div v-for="t in tags" :key="t.id" class="flex items-center justify-between gap-3 px-3 py-2.5 bg-iq-panel border border-iq-border rounded-xl">
+              <div class="min-w-0">
+                <span class="text-sm text-iq-accent">#{{ t.name }}</span>
+                <span class="text-xs text-iq-muted ml-2">{{ t.video_count||0 }} 个视频</span>
+              </div>
+              <button @click="deleteGlobalTag(t)" class="shrink-0 px-2.5 py-1 text-xs text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/10">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 预览图设置 -->
+      <div v-if="settingsTab==='preview'" class="max-w-xl">
+        <div class="bg-iq-card border border-iq-border rounded-2xl p-6 space-y-4">
+          <h3 class="font-semibold">预览图生成设置</h3>
+          <p class="text-xs text-iq-muted">保存后将按此数量自动为所有视频重新截取预览帧（后台进行，视频多时需等待）</p>
+          <div>
+            <label class="text-sm text-iq-muted">预览图数量（0–20）</label>
+            <input v-model.number="previewCount" type="number" min="0" max="20" class="mt-1 w-full px-3 py-2 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+          </div>
+          <button @click="savePreviewSettings" class="px-5 py-2.5 bg-iq-accent text-black text-sm font-medium rounded-xl">保存设置</button>
+          <p v-if="previewSaved" class="text-iq-accent text-sm">已保存</p>
+        </div>
+      </div>
+
+      <!-- 分页管理 -->
+      <div v-if="settingsTab==='paging'" class="max-w-xl">
+        <div class="bg-iq-card border border-iq-border rounded-2xl p-6 space-y-5">
+          <div>
+            <h3 class="font-semibold">分页管理</h3>
+            <p class="text-xs text-iq-muted mt-1">分别设置首页视频网格与「视频管理」列表的每页显示数量</p>
+          </div>
+          <div>
+            <label class="text-sm text-iq-muted">首页分页 · 每页数量</label>
+            <div class="mt-1 flex gap-2 items-center">
+              <input v-model.number="pageSizeInput" type="number" min="6" max="100" class="flex-1 px-3 py-2 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent" placeholder="6–100">
+              <button @click="savePageSize" class="px-4 py-2 bg-iq-accent text-black text-sm font-medium rounded-xl shrink-0">保存</button>
+            </div>
+            <p class="text-xs text-iq-muted mt-1">控制首页视频列表每页显示多少部（当前：{{ pageSize }}）</p>
+          </div>
+          <div>
+            <label class="text-sm text-iq-muted">视频管理 · 每页数量</label>
+            <div class="mt-1 flex gap-2 items-center">
+              <input v-model.number="mgmtPageSizeInput" type="number" min="5" max="100" class="flex-1 px-3 py-2 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent" placeholder="5–100">
+              <button @click="saveMgmtPageSize" class="px-4 py-2 bg-iq-accent text-black text-sm font-medium rounded-xl shrink-0">保存</button>
+            </div>
+            <p class="text-xs text-iq-muted mt-1">控制设置页「视频管理」列表每页显示多少条（当前：{{ mgmtPageSize }}）</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 同步刷新设置 -->
+      <div v-if="settingsTab==='sync'" class="max-w-xl">
+        <div class="bg-iq-card border border-iq-border rounded-2xl p-6 space-y-5">
+          <div>
+            <h3 class="font-semibold">文件监控</h3>
+            <p class="text-xs text-iq-muted mt-1">开启后，当视频目录中有新增或修改的视频文件时，后台会自动扫描入库，无需手动刷新。</p>
+          </div>
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-sm">启用文件监控</span>
+              <p class="text-xs text-iq-muted mt-0.5">关闭后仅能通过手动扫描或定时刷新更新列表</p>
+            </div>
+            <button @click="toggleWatcher" class="relative w-11 h-6 rounded-full transition"
+              :class="enableWatcher?'bg-iq-accent':'bg-iq-border'">
+              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                :class="enableWatcher?'translate-x-5':''"></span>
+            </button>
+          </div>
+          <div class="pt-3 border-t border-iq-border">
+            <h3 class="font-semibold">定时刷新列表</h3>
+            <p class="text-xs text-iq-muted mt-1">作为文件监控的补充：定时重新拉取首页列表数据，防止偶发未监控到的变更。不影响后台入库。</p>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm">开启定时刷新</span>
+            <button @click="refreshEnabled=!refreshEnabled;saveRefreshSettings()" class="relative w-11 h-6 rounded-full transition"
+              :class="refreshEnabled?'bg-iq-accent':'bg-iq-border'">
+              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                :class="refreshEnabled?'translate-x-5':''"></span>
+            </button>
+          </div>
+          <div v-if="refreshEnabled" class="space-y-3">
+            <div>
+              <label class="text-sm text-iq-muted">刷新间隔</label>
+              <select v-model="refreshInterval" @change="onRefreshIntervalChange" class="mt-1 w-full px-3 py-2 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+                <option value="30">每 30 分钟</option>
+                <option value="60">每 1 小时</option>
+                <option value="360">每 6 小时</option>
+                <option value="1440">每天</option>
+                <option value="10080">每周</option>
+                <option value="custom">自定义（分钟）</option>
+              </select>
+            </div>
+            <div v-if="refreshInterval==='custom'">
+              <label class="text-sm text-iq-muted">自定义间隔（分钟，最少 5）</label>
+              <input v-model.number="refreshCustomMin" type="number" min="5" max="10080" class="mt-1 w-full px-3 py-2 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+            </div>
+            <button @click="saveRefreshSettings" class="px-5 py-2.5 bg-iq-accent text-black text-sm font-medium rounded-xl">保存设置</button>
+            <p v-if="refreshSaved" class="text-iq-accent text-sm">已保存</p>
+          </div>
+          <div class="pt-3 border-t border-iq-border">
+            <p class="text-xs text-iq-muted mb-3">手动触发一次完整扫描（检测新增/删除并更新库）</p>
+            <button @click="manualScan" :disabled="scanning" class="px-5 py-2.5 bg-iq-card border border-iq-border rounded-xl text-sm text-iq-muted hover:text-white disabled:opacity-50">
+              <i class="fas fa-sync-alt mr-1" :class="scanning?'fa-spin':''"></i>{{ scanning?'扫描中...':'立即扫描视频库' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 账户 -->
+      <div v-if="settingsTab==='account'" class="max-w-xl">
+        <div class="bg-iq-card border border-iq-border rounded-2xl p-6">
+          <h3 class="font-semibold mb-4">账户管理</h3>
+          <form @submit.prevent="changeProfile" class="space-y-3">
+            <div>
+              <label class="text-xs text-iq-muted">用户名</label>
+              <input v-model="profileForm.username" type="text" required minlength="2" class="mt-1 w-full px-4 py-2.5 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+            </div>
+            <div>
+              <label class="text-xs text-iq-muted">原密码（必填）</label>
+              <input v-model="profileForm.old_password" type="password" required class="mt-1 w-full px-4 py-2.5 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+            </div>
+            <div>
+              <label class="text-xs text-iq-muted">新密码（不改密码可留空）</label>
+              <input v-model="profileForm.new_password" type="password" minlength="6" placeholder="至少6位" class="mt-1 w-full px-4 py-2.5 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+            </div>
+            <div>
+              <label class="text-xs text-iq-muted">确认新密码</label>
+              <input v-model="profileForm.confirm" type="password" placeholder="与新密码一致" class="mt-1 w-full px-4 py-2.5 bg-iq-panel border border-iq-border rounded-xl text-sm focus:outline-none focus:border-iq-accent">
+            </div>
+            <div v-if="pwdError" class="text-red-400 text-sm">{{ pwdError }}</div>
+            <div v-if="pwdSuccess" class="text-iq-accent text-sm">{{ pwdSuccess }}</div>
+            <button type="submit" :disabled="pwdLoading" class="px-5 py-2.5 bg-iq-accent text-black font-medium rounded-xl text-sm disabled:opacity-50">{{ pwdLoading?'提交中...':'保存' }}</button>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <div v-if="toast" class="fixed bottom-6 right-6 z-50 px-5 py-3 bg-iq-card border border-iq-border rounded-xl shadow-xl text-sm">
+      <i :class="toast.icon" class="text-iq-accent mr-2"></i>{{ toast.message }}
+    </div>
+  </div>
+</div>
+<script src="https://registry.npmmirror.com/vue/3.4.21/files/dist/vue.global.prod.js"></script>
+<script src="https://cdn.staticfile.org/vue/3.4.21/vue.global.prod.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/vue/3.4.21/vue.global.prod.min.js"></script>
+<script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script>
+// 若 CDN 均失败给出提示
+window.addEventListener('load', function(){
+  if(typeof Vue === 'undefined'){
+    document.body.innerHTML = '<div style="color:#f0f0f5;padding:40px;font-family:sans-serif;text-align:center;background:#0b0b0f;min-height:100vh"><h2>前端资源加载失败</h2><p style="color:#8a8a9a;margin-top:12px">无法加载 Vue，请检查网络或换用可访问外网的环境。<br>也可尝试刷新页面。</p></div>';
+  }
+});
+</script>
+<script>
+const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
+createApp({
+  setup() {
+    const token = ref(localStorage.getItem('vm_token')||'');
+    const loginForm = ref({username:'',password:''});
+    const loginError = ref('');
+    const loggingIn = ref(false);
+    const page = ref('home');
+    const videos = ref([]);
+    const tags = ref([]);
+    const loading = ref(false);
+    const scanning = ref(false);
+    const pageNum = ref(1);
+    const total = ref(0);
+    const pageSize = ref(parseInt(localStorage.getItem('vm_page_size')||'24',10));
+    const pageSizeInput = ref(pageSize.value);
+    const mgmtPageSize = ref(parseInt(localStorage.getItem('vm_mgmt_page_size')||'20',10));
+    const mgmtPageSizeInput = ref(mgmtPageSize.value);
+    const totalPages = computed(()=>{
+      const ps = Math.max(1, parseInt(pageSize.value,10) || 24);
+      const t = Math.max(0, parseInt(total.value,10) || 0);
+      if(t === 0) return 1;
+      return Math.max(1, Math.ceil(t / ps));
+    });
+    const canPrev = computed(()=> (parseInt(pageNum.value,10)||1) > 1 && !loading.value);
+    const canNext = computed(()=>{
+      const cur = parseInt(pageNum.value,10)||1;
+      return cur < totalPages.value && !loading.value;
+    });
+    const pageLabel = computed(()=>{
+      const cur = Math.min(Math.max(1, parseInt(pageNum.value,10)||1), totalPages.value);
+      return cur;
+    });
+    const hasMore = computed(()=>videos.value.length<total.value);
+    const searchQuery = ref('');
+    const sortBy = ref('scanned_at');
+    const sortOrder = ref('desc');
+    const sortOptions = [
+      {value:'scanned_at', label:'最近添加'},
+      {value:'filename', label:'名称'},
+      {value:'duration', label:'时长'},
+    ];
+    const activeTagId = ref(null); // 兼容旧逻辑
+    const activeTagIds = ref([]); // 多选标签
+    const showFilter = ref(false);
+    const selected = ref(null);
+    const recommendations = ref([]);
+    const recsLoading = ref(false);
+    const toast = ref(null);
+    const player = ref(null);
+    const settingsTab = ref('videos');
+    const mgmtVideos = ref([]);
+    const mgmtPage = ref(1);
+    const mgmtTotal = ref(0);
+    const mgmtTotalPages = computed(()=>Math.max(1, Math.ceil(mgmtTotal.value/(mgmtPageSize.value||20))));
+    const mgmtQuery = ref('');
+    const mgmtFilter = ref('all');
+    const mgmtFilterOpen = ref(false);
+    const openTagPickerId = ref(null);
+    const mgmtFilterOptions = [
+      {value:'all',label:'全部'},
+      {value:'no_tag',label:'无标签'},
+      {value:'has_tag',label:'有标签'},
+      {value:'no_notes',label:'无简介'},
+      {value:'has_notes',label:'有简介'},
+    ];
+    const mgmtFilterLabel = computed(()=>{
+      const o = mgmtFilterOptions.find(x=>x.value===mgmtFilter.value);
+      return o ? o.label : '全部';
+    });
+    const newTagName = ref('');
+    const newGlobalTag = ref('');
+    const previewCount = ref(parseInt(localStorage.getItem('vm_preview_count')||'4',10));
+    const previewSaved = ref(false);
+    // 列表刷新设置（默认关闭，日常靠文件监控）
+    const enableWatcher = ref(true);
+    const refreshEnabled = ref(localStorage.getItem('vm_refresh_enabled')==='1');
+    const refreshInterval = ref(localStorage.getItem('vm_refresh_interval')||'1440'); // 默认每天
+    const refreshCustomMin = ref(parseInt(localStorage.getItem('vm_refresh_custom')||'60',10));
+    const refreshSaved = ref(false);
+    let listRefreshTimer = null;
+    const pwdForm = ref({old_password:'',new_password:'',confirm:''});
+    const profileForm = ref({username:'',old_password:'',new_password:'',confirm:''});
+    const pwdError = ref('');
+    const pwdSuccess = ref('');
+    const pwdLoading = ref(false);
+
+    const listTitle = computed(()=>{
+      if(activeTagIds.value.length){
+        const names=activeTagIds.value.map(id=>{const t=tags.value.find(x=>x.id===id);return t?'#'+t.name:''}).filter(Boolean);
+        return names.join(' ') || '标签筛选';
+      }
+      if(searchQuery.value) return '搜索：'+searchQuery.value;
+      return '全部视频';
+    });
+
+    const api = async (url, options={})=>{
+      const headers=options.headers||{};
+      if(token.value) headers['Authorization']=`Bearer ${token.value}`;
+      if(options.body&&typeof options.body==='object'&&!(options.body instanceof FormData)){
+        headers['Content-Type']='application/json'; options.body=JSON.stringify(options.body);
+      }
+      const res=await fetch(url,{...options,headers});
+      if(res.status===401){logout();throw new Error('Unauthorized');}
+      if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(typeof err.detail==='string'?err.detail:res.statusText);}
+      if(res.status===204) return null;
+      return res.json();
+    };
+    const showToast=(m,i='fas fa-check-circle')=>{toast.value={message:m,icon:i};setTimeout(()=>toast.value=null,2500);};
+
+    const login=async()=>{
+      loggingIn.value=true;loginError.value='';
+      try{
+        const form=new URLSearchParams(); form.append('username',loginForm.value.username); form.append('password',loginForm.value.password);
+        const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form});
+        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'登录失败');}
+        token.value=(await res.json()).access_token; localStorage.setItem('vm_token',token.value); await initApp();
+      }catch(e){loginError.value=e.message;} finally{loggingIn.value=false;}
+    };
+    const logout=()=>{token.value='';localStorage.removeItem('vm_token');page.value='home';stopRefresh();};
+    const loadServerSettings=async()=>{
+      try{
+        const s = await api('/api/settings');
+        if(s.preview_count!=null){previewCount.value=s.preview_count;localStorage.setItem('vm_preview_count',String(s.preview_count));}
+        if(s.page_size!=null){pageSize.value=s.page_size;pageSizeInput.value=s.page_size;localStorage.setItem('vm_page_size',String(s.page_size));}
+        if(s.mgmt_page_size!=null){mgmtPageSize.value=s.mgmt_page_size;mgmtPageSizeInput.value=s.mgmt_page_size;localStorage.setItem('vm_mgmt_page_size',String(s.mgmt_page_size));}
+        if(s.refresh_enabled!=null){refreshEnabled.value=!!s.refresh_enabled;localStorage.setItem('vm_refresh_enabled',s.refresh_enabled?'1':'0');}
+        if(s.refresh_interval!=null){refreshInterval.value=String(s.refresh_interval);localStorage.setItem('vm_refresh_interval',String(s.refresh_interval));}
+        if(s.refresh_custom_min!=null){refreshCustomMin.value=s.refresh_custom_min;localStorage.setItem('vm_refresh_custom',String(s.refresh_custom_min));}
+        if(s.enable_watcher!=null){enableWatcher.value=!!s.enable_watcher;}
+      }catch(e){}
+    };
+    const initApp=async()=>{
+      await loadServerSettings();
+      await Promise.all([loadTags(),loadVideos(true)]);
+      if((total.value||0)===0) triggerAutoScan();
+      applyRefreshTimer();
+    };
+    const triggerAutoScan=async()=>{
+      try{scanning.value=true;await api('/api/scan',{method:'POST'});
+        const poll=setInterval(async()=>{try{const s=await api('/api/scan/last');if(!s.running){clearInterval(poll);scanning.value=false;await Promise.all([loadVideos(true),loadTags()]);if(s.last_result?.added)showToast(`新增 ${s.last_result.added} 个视频`);if(s.last_result?.removed)showToast(`清理 ${s.last_result.removed} 个失效记录`);}}catch(e){clearInterval(poll);scanning.value=false;}},2500);
+      }catch(e){scanning.value=false;}
+    };
+    const manualScan=()=>{triggerAutoScan();};
+    const getRefreshMs=()=>{
+      if(refreshInterval.value==='custom'){
+        const m=Math.max(5,parseInt(refreshCustomMin.value,10)||60);
+        return m*60*1000;
+      }
+      return (parseInt(refreshInterval.value,10)||1440)*60*1000;
+    };
+    const applyRefreshTimer=()=>{
+      if(listRefreshTimer){clearInterval(listRefreshTimer);listRefreshTimer=null;}
+      if(!refreshEnabled.value) return;
+      const ms=getRefreshMs();
+      listRefreshTimer=setInterval(()=>{
+        if(page.value==='home'&&!loading.value) loadVideos(true);
+      },ms);
+    };
+    const toggleWatcher=async()=>{
+      const next = !enableWatcher.value;
+      enableWatcher.value = next;
+      try{
+        await api('/api/settings',{method:'PUT',body:{enable_watcher:next}});
+        showToast(next?'文件监控已开启':'文件监控已关闭');
+      }catch(e){
+        enableWatcher.value = !next;
+        showToast(e.message||'切换失败','fas fa-exclamation-circle');
+      }
+    };
+    const saveRefreshSettings=async()=>{
+      localStorage.setItem('vm_refresh_enabled',refreshEnabled.value?'1':'0');
+      localStorage.setItem('vm_refresh_interval',String(refreshInterval.value));
+      localStorage.setItem('vm_refresh_custom',String(Math.max(5,parseInt(refreshCustomMin.value,10)||60)));
+      try{
+        await api('/api/settings',{method:'PUT',body:{
+          refresh_enabled: !!refreshEnabled.value,
+          refresh_interval: String(refreshInterval.value),
+          refresh_custom_min: Math.max(5,parseInt(refreshCustomMin.value,10)||60),
+        }});
+      }catch(e){}
+      applyRefreshTimer();
+      refreshSaved.value=true;
+      setTimeout(()=>refreshSaved.value=false,2000);
+      showToast(refreshEnabled.value?'定时刷新已开启':'定时刷新已关闭');
+    };
+    const onRefreshIntervalChange=()=>{if(refreshInterval.value!=='custom')saveRefreshSettings();};
+    const savePageSize=async()=>{
+      let n=parseInt(pageSizeInput.value,10);
+      if(isNaN(n)||n<6) n=6;
+      if(n>100) n=100;
+      pageSize.value=n;
+      pageSizeInput.value=n;
+      localStorage.setItem('vm_page_size',String(n));
+      try{await api('/api/settings',{method:'PUT',body:{page_size:n}});}catch(e){}
+      pageNum.value=1;
+      loadVideos(true);
+      showToast('首页每页数量已设为 '+n);
+    };
+    const saveMgmtPageSize=async()=>{
+      let n=parseInt(mgmtPageSizeInput.value,10);
+      if(isNaN(n)||n<5) n=5;
+      if(n>100) n=100;
+      mgmtPageSize.value=n;
+      mgmtPageSizeInput.value=n;
+      localStorage.setItem('vm_mgmt_page_size',String(n));
+      try{await api('/api/settings',{method:'PUT',body:{mgmt_page_size:n}});}catch(e){}
+      mgmtPage.value=1;
+      loadMgmt(true);
+      showToast('视频管理每页数量已设为 '+n);
+    };
+    const stopRefresh=()=>{if(listRefreshTimer){clearInterval(listRefreshTimer);listRefreshTimer=null;}};
+    const toggleFilter=()=>{showFilter.value=!showFilter.value;};
+
+    const loadTags=async()=>{try{tags.value=await api('/api/tags');}catch(e){}};
+    const createGlobalTag=async()=>{
+      const name=(newGlobalTag.value||'').trim();
+      if(!name){showToast('请输入标签名称','fas fa-exclamation-circle');return;}
+      try{
+        await api('/api/tags',{method:'POST',body:{name,color:'#00c476'}});
+        newGlobalTag.value='';
+        await loadTags();
+        showToast('标签已添加');
+      }catch(e){showToast(e.message||'添加失败','fas fa-exclamation-circle');}
+    };
+    const deleteGlobalTag=async(t)=>{
+      if(!confirm('确定删除标签「'+t.name+'」？\n视频上的该标签也会被移除。'))return;
+      try{
+        await api('/api/tags/'+t.id,{method:'DELETE'});
+        await loadTags();
+        loadMgmt(false);
+        showToast('标签已删除');
+      }catch(e){showToast(e.message||'删除失败','fas fa-exclamation-circle');}
+    };
+    const buildQuery=()=>{
+      const safePage=Math.max(1, parseInt(pageNum.value,10)||1);
+      const p=new URLSearchParams({page:safePage,page_size:pageSize.value||24,sort:sortBy.value,order:sortOrder.value||'desc'});
+      if(searchQuery.value) p.set('q',searchQuery.value);
+      if(activeTagIds.value.length) p.set('tag_ids', activeTagIds.value.join(','));
+      else if(activeTagId.value) p.set('tag_id',activeTagId.value);
+      return p.toString();
+    };
+    const loadVideos=async(mode=true)=>{
+      // mode true = reset to page 1; 'page' = keep pageNum; false = append (legacy)
+      if(mode===true){pageNum.value=1;videos.value=[];}
+      else if(mode==='page'){videos.value=[];}
+      loading.value=true;
+      try{const data=await api(`/api/videos?${buildQuery()}`); videos.value=data.items; total.value=data.total;}
+      catch(e){showToast(e.message,'fas fa-exclamation-circle');} finally{loading.value=false;}
+    };
+    const loadMore=()=>{if(!loading.value&&hasMore.value){pageNum.value++;loadVideos(false);}};
+    const goPage=async(n)=>{
+      const target = parseInt(n, 10);
+      if(!target || target < 1 || loading.value) return;
+      // 先写入页码，buildQuery 会读到
+      pageNum.value = target;
+      videos.value = [];
+      loading.value = true;
+      try{
+        const data = await api('/api/videos?' + buildQuery());
+        videos.value = (data && data.items) ? data.items : [];
+        total.value = (data && typeof data.total === 'number') ? data.total : 0;
+        // 根据最新 total 校正页码，避免显示超出总页数
+        const ps = Math.max(1, parseInt(pageSize.value,10)||24);
+        const maxP = Math.max(1, Math.ceil((total.value||0)/ps));
+        if(pageNum.value > maxP) pageNum.value = maxP;
+      }catch(e){
+        showToast(e.message||'加载失败','fas fa-exclamation-circle');
+      }finally{
+        loading.value = false;
+      }
+      try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){}
+    };
+    const prevPage=()=>{ if(pageNum.value > 1 && !loading.value) goPage(pageNum.value - 1); };
+    const nextPage=()=>{ if(pageNum.value < totalPages.value && !loading.value) goPage(pageNum.value + 1); };
+    const toggleSort=(val)=>{
+      if(sortBy.value===val){
+        sortOrder.value = sortOrder.value==='desc' ? 'asc' : 'desc';
+      } else {
+        sortBy.value = val;
+        // 名称默认正序，其他默认倒序
+        sortOrder.value = (val==='filename') ? 'asc' : 'desc';
+      }
+      loadVideos(true);
+    };
+    const doSearch=()=>{activeTagIds.value=[];activeTagId.value=null;showFilter.value=false;page.value='home';loadVideos(true);};
+    const clearTagFilter=()=>{activeTagIds.value=[];activeTagId.value=null;searchQuery.value='';page.value='home';loadVideos(true);};
+    const toggleTagFilter=(id)=>{
+      const arr=activeTagIds.value.slice();
+      const i=arr.indexOf(id);
+      if(i>=0) arr.splice(i,1); else arr.push(id);
+      activeTagIds.value=arr;
+      activeTagId.value=arr.length===1?arr[0]:null;
+      searchQuery.value='';
+      page.value='home';
+      loadVideos(true);
+    };
+    const setFilter=(mode,id=null)=>{
+      if(mode==='all'){clearTagFilter();return;}
+      if(mode==='tag'&&id!=null) toggleTagFilter(id);
+    };
+    const goHome=()=>{page.value='home';selected.value=null;if(player.value)player.value.pause();/* 不强制重新拉列表，减少刷新 */if(!videos.value.length)loadVideos(true);};
+    const openSettings=async()=>{
+      page.value='settings';settingsTab.value='videos';mgmtPage.value=1;loadMgmt(true);
+      try{const me=await api('/api/auth/me');profileForm.value.username=me.username;}catch(e){}
+    };
+
+    const openDetail=async(v)=>{
+      try{selected.value=await api(`/api/videos/${v.id}`);page.value='detail';recommendations.value=[];
+        nextTick(()=>{if(player.value)player.value.load();}); loadRecs(v.id);
+      }catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const loadRecs=async(id)=>{recsLoading.value=true;try{recommendations.value=await api(`/api/videos/${id}/recommendations?limit=12`);}catch(e){recommendations.value=[];}finally{recsLoading.value=false;}};
+    const formatSize=(b)=>{if(!b)return'0 B';const u=['B','KB','MB','GB'];let i=0,n=b;while(n>=1024&&i<u.length-1){n/=1024;i++;}return n.toFixed(i?1:0)+' '+u[i];};
+    const availableTags=(v)=>{const ids=new Set((v.tags||[]).map(t=>t.id));return tags.value.filter(t=>!ids.has(t.id));};
+
+    const loadMgmt=async(reset)=>{
+      if(reset){/* keep page */}
+      try{
+        const params=new URLSearchParams({page:mgmtPage.value,page_size:mgmtPageSize.value||20,sort:'filename',order:'asc'});
+        if(mgmtQuery.value) params.set('q',mgmtQuery.value);
+        const data=await api(`/api/videos?${params}`);
+        let items=data.items||[];
+        if(mgmtFilter.value==='no_tag') items=items.filter(v=>!v.tags?.length);
+        else if(mgmtFilter.value==='has_tag') items=items.filter(v=>v.tags?.length);
+        else if(mgmtFilter.value==='no_notes') items=items.filter(v=>!v.notes);
+        else if(mgmtFilter.value==='has_notes') items=items.filter(v=>!!v.notes);
+        mgmtVideos.value=items.map(v=>({...v,_newTag:''}));
+        mgmtTotal.value = (mgmtFilter.value==='all'&&!mgmtQuery.value)?data.total:items.length;
+      }catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const fileBase=(name)=>{if(!name)return'';const i=name.lastIndexOf('.');return i>0?name.slice(0,i):name;};
+    const fileExt=(name)=>{if(!name)return'';const i=name.lastIndexOf('.');return i>0?name.slice(i):'';};
+    const saveFilenameBase=async(v,base)=>{
+      const ext=fileExt(v.filename); const name=(base||'').trim(); if(!name)return;
+      const full=name.endsWith(ext)?name:(name+ext);
+      await saveFilename(v,full);
+    };
+    const saveFilename=async(v,name)=>{
+      if(!name||name===v.filename)return;
+      try{const u=await api(`/api/videos/${v.id}`,{method:'PATCH',body:{filename:name}});v.filename=u.filename;showToast('文件名已更新');}catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const saveNotes=async(v,notes)=>{
+      try{const u=await api(`/api/videos/${v.id}`,{method:'PATCH',body:{notes}});v.notes=u.notes;showToast('简介已保存');}catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const setMgmtFilter=(val)=>{mgmtFilter.value=val;mgmtFilterOpen.value=false;loadMgmt(true);};
+    const mgmtAddTagById=async(v,id)=>{
+      openTagPickerId.value=null;
+      if(!id)return;
+      try{const u=await api(`/api/videos/${v.id}`,{method:'PATCH',body:{tag_ids:[...(v.tags||[]).map(x=>x.id),id]}});Object.assign(v,u,{_newTag:''});loadTags();}catch(err){showToast(err.message,'fas fa-exclamation-circle');}
+    };
+    const mgmtAddTag=async(v,e)=>{
+      const id=parseInt(e.target.value);if(!id)return;e.target.value='';
+      await mgmtAddTagById(v,id);
+    };
+    const mgmtRemoveTag=async(v,t)=>{
+      try{const u=await api(`/api/videos/${v.id}`,{method:'PATCH',body:{tag_ids:(v.tags||[]).filter(x=>x.id!==t.id).map(x=>x.id)}});Object.assign(v,u,{_newTag:v._newTag||''});loadTags();}catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const createAndAddTag=async(v)=>{
+      const name=(v._newTag||'').trim();if(!name)return;
+      try{
+        let tag=tags.value.find(t=>t.name===name);
+        if(!tag){tag=await api('/api/tags',{method:'POST',body:{name}});await loadTags();}
+        const ids=[...(v.tags||[]).map(x=>x.id)];
+        if(!ids.includes(tag.id)) ids.push(tag.id);
+        const u=await api(`/api/videos/${v.id}`,{method:'PATCH',body:{tag_ids:ids}});
+        Object.assign(v,u,{_newTag:''}); showToast('标签已添加');
+      }catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const createTag=async()=>{
+      if(!newTagName.value.trim())return;
+      try{await api('/api/tags',{method:'POST',body:{name:newTagName.value.trim()}});newTagName.value='';await loadTags();showToast('标签已创建');}catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const deleteTag=async(t)=>{
+      if(!confirm(`删除标签「${t.name}」？`))return;
+      try{await api(`/api/tags/${t.id}`,{method:'DELETE'});await loadTags();showToast('已删除');}catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const savePreviewSettings=async()=>{
+      const n=Math.max(0,Math.min(20,parseInt(previewCount.value,10)||0));
+      previewCount.value=n;
+      localStorage.setItem('vm_preview_count',String(n));
+      try{await api('/api/settings',{method:'PUT',body:{preview_count:n}});}catch(e){}
+      // 保存后自动后台批量更新所有视频预览图
+      try{
+        const r=await api(`/api/videos/regenerate-all-thumbnails?preview_count=${n}`,{method:'POST'});
+        previewSaved.value=true; setTimeout(()=>previewSaved.value=false,2000);
+        showToast(`已保存，正在后台更新 ${r.total||0} 个视频的预览图…`);
+      }catch(e){
+        previewSaved.value=true; setTimeout(()=>previewSaved.value=false,2000);
+        showToast('数量已保存，但批量更新失败：'+(e.message||''),'fas fa-exclamation-circle');
+      }
+    };
+    const regenThumb=async(v)=>{
+      try{
+        const n=parseInt(localStorage.getItem('vm_preview_count')||'4',10);
+        await api(`/api/videos/${v.id}/regenerate-thumbnail?preview_count=${n}`,{method:'POST'});
+        showToast('封面生成中…');
+        setTimeout(async()=>{if(selected.value?.id===v.id)selected.value=await api(`/api/videos/${v.id}`);},3500);
+      }catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const confirmDelete=async(v)=>{
+      if(!confirm(`确定删除「${v.filename}」？\n\n此操作将同时删除源文件，且不可恢复。`))return;
+      try{
+        await api(`/api/videos/${v.id}?delete_file=true`,{method:'DELETE'});
+        goHome();
+        showToast('已删除源文件和记录');
+      }catch(e){showToast(e.message,'fas fa-exclamation-circle');}
+    };
+    const changeProfile=async()=>{
+      pwdError.value='';pwdSuccess.value='';
+      if(profileForm.value.new_password && profileForm.value.new_password!==profileForm.value.confirm){pwdError.value='两次新密码不一致';return;}
+      pwdLoading.value=true;
+      try{
+        const body={old_password:profileForm.value.old_password,username:profileForm.value.username};
+        if(profileForm.value.new_password) body.new_password=profileForm.value.new_password;
+        await api('/api/auth/change-profile',{method:'POST',body});
+        pwdSuccess.value='账户已更新，请重新登录';
+        setTimeout(logout,1500);
+      }catch(e){pwdError.value=e.message;} finally{pwdLoading.value=false;}
+    };
+    const changePassword=async()=>{
+      pwdError.value='';pwdSuccess.value='';
+      if(pwdForm.value.new_password!==pwdForm.value.confirm){pwdError.value='两次密码不一致';return;}
+      pwdLoading.value=true;
+      try{await api('/api/auth/change-password',{method:'POST',body:{old_password:pwdForm.value.old_password,new_password:pwdForm.value.new_password}});pwdSuccess.value='修改成功，请重新登录';setTimeout(logout,1500);}
+      catch(e){pwdError.value=e.message;} finally{pwdLoading.value=false;}
+    };
+    const seekPreview=(i)=>{
+      if(player.value&&selected.value?.duration&&selected.value.preview_images?.length){
+        player.value.currentTime=(selected.value.duration/(selected.value.preview_images.length+1))*(i+1);
+      }
+    };
+
+    onMounted(()=>{
+      const el=document.getElementById('app-loading');
+      if(el) el.style.display='none';
+      if(token.value)initApp().catch(()=>logout());
+    });
+    onUnmounted(()=>stopRefresh());
+
+    return {
+      token,loginForm,loginError,loggingIn,login,logout,page,videos,tags,loading,scanning,hasMore,total,
+      searchQuery,sortBy,sortOrder,sortOptions,activeTagId,activeTagIds,showFilter,listTitle,selected,recommendations,recsLoading,toast,player,
+      settingsTab,mgmtVideos,mgmtPage,mgmtTotal,mgmtTotalPages,mgmtQuery,mgmtFilter,mgmtFilterOpen,mgmtFilterOptions,mgmtFilterLabel,openTagPickerId,newTagName,newGlobalTag,
+      previewCount,previewSaved,enableWatcher,refreshEnabled,refreshInterval,refreshCustomMin,refreshSaved,pageSize,pageSizeInput,mgmtPageSize,mgmtPageSizeInput,
+      pwdForm,pwdError,pwdSuccess,pwdLoading,
+      loadVideos,loadMore,goPage,prevPage,nextPage,toggleSort,totalPages,pageLabel,canPrev,canNext,doSearch,setFilter,clearTagFilter,toggleTagFilter,toggleFilter,goHome,openSettings,profileForm,changeProfile,openDetail,formatSize,availableTags,
+      loadMgmt,createGlobalTag,deleteGlobalTag,newGlobalTag,fileBase,fileExt,saveFilenameBase,saveFilename,saveNotes,setMgmtFilter,mgmtAddTagById,mgmtAddTag,mgmtRemoveTag,createAndAddTag,createTag,deleteTag,
+      savePreviewSettings,toggleWatcher,saveRefreshSettings,onRefreshIntervalChange,savePageSize,saveMgmtPageSize,manualScan,regenThumb,confirmDelete,changePassword,seekPreview
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
