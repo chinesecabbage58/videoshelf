@@ -2,6 +2,10 @@
 
 个人/局域网视频库管理工具。支持扫描本地视频、封面与预览图、标签、搜索、在线播放，适合部署在 NAS（如绿联）或 Docker 环境。
 
+## 项目地址
+- GitHub：https://github.com/chinesecabbage58/videoshelf
+- Docker Hub：https://hub.docker.com/r/baibaibai122/videoshelf
+
 ## 功能
 
 - 扫描指定目录中的视频并入库
